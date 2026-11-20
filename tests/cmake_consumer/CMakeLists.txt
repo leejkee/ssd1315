@@ -1,0 +1,25 @@
+cmake_minimum_required(VERSION 3.16)
+project(ssd1315_consumer LANGUAGES C)
+
+set(SSD1315_IMPORT_MODE "subdirectory" CACHE STRING "subdirectory or fetchcontent")
+get_filename_component(SSD1315_SOURCE_DIR "${CMAKE_CURRENT_LIST_DIR}/../.." ABSOLUTE)
+
+if(SSD1315_IMPORT_MODE STREQUAL "subdirectory")
+    add_subdirectory("${SSD1315_SOURCE_DIR}" ssd1315)
+elseif(SSD1315_IMPORT_MODE STREQUAL "fetchcontent")
+    include(FetchContent)
+    # Exercise FetchContent integration offline using the current checkout.
+    FetchContent_Declare(ssd1315 SOURCE_DIR "${SSD1315_SOURCE_DIR}")
+    FetchContent_MakeAvailable(ssd1315)
+else()
+    message(FATAL_ERROR "Unknown SSD1315_IMPORT_MODE")
+endif()
+
+add_executable(consumer main.c)
+target_link_libraries(consumer PRIVATE ssd1315::ssd1315)
+if(SSD1315_BUILD_EXAMPLE)
+    target_link_libraries(consumer PRIVATE ssd1315::ascii)
+    target_compile_definitions(consumer PRIVATE TEST_ASCII)
+endif()
+enable_testing()
+add_test(NAME consumer COMMAND consumer)
