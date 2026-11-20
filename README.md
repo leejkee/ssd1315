@@ -2,6 +2,8 @@
 
 面向 128×64 单色 OLED 的可移植 C99 驱动。核心仅依赖标准 C 头文件，不依赖 MCU SDK、HAL、RTOS 或字库。使用 1024 字节静态显存，按脏页刷新，无动态内存。
 
+[![Seeed Studio Grove 0.96 英寸 SSD1315 OLED 显示模块](https://raw.githubusercontent.com/SeeedDocument/Grove-OLED-Display-0.96-SSD1315-/master/img/Grove-OLED-Displey-0.96-SSD1315-wiki.jpg)](https://wiki.seeedstudio.com/Grove-OLED-Display-0.96-SSD1315/)
+
 ## 接入
 
 将 `src/bsp_ssd1315.c` 加入工程，并添加 `include/` 头文件路径；CMake 项目可以按下面两种方式引入，统一链接 `ssd1315::ssd1315`。
