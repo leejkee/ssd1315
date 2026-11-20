@@ -4,51 +4,39 @@
 
 [![Seeed Studio Grove 0.96 英寸 SSD1315 OLED 显示模块](https://raw.githubusercontent.com/SeeedDocument/Grove-OLED-Display-0.96-SSD1315-/master/img/Grove-OLED-Displey-0.96-SSD1315-wiki.jpg)](https://wiki.seeedstudio.com/Grove-OLED-Display-0.96-SSD1315/)
 
-## 接入
+## CMake support
 
-将 `src/bsp_ssd1315.c` 加入工程，并添加 `include/` 头文件路径；CMake 项目可以按下面两种方式引入，统一链接 `ssd1315::ssd1315`。
+### For subdirectory
 
-### CMake：本地 clone 后导入
+在应用工程根目录执行：
 
-将本项目 clone 到应用工程的 `third_party/ssd1315`，在应用的 `CMakeLists.txt` 中写入：
+```sh
+git clone https://github.com/leejkee/ssd1315.git third_party/ssd1315
+```
+
+CMake接入示例：（在应用的 `CMakeLists.txt` 中添加）
 
 ```cmake
-cmake_minimum_required(VERSION 3.16)
-project(my_app LANGUAGES C)
-
 add_subdirectory(third_party/ssd1315)
-add_executable(my_app main.c)
 target_link_libraries(my_app PRIVATE ssd1315::ssd1315)
 ```
 
-如果 clone 在工程目录之外，使用 `add_subdirectory(/path/to/ssd1315 ${CMAKE_CURRENT_BINARY_DIR}/ssd1315)` 指定独立构建目录。
+### Use FetchContent
 
-### CMake：FetchContent 自动下载导入
+在应用的 `CMakeLists.txt` 中添加以下代码，CMake 会在配置阶段获取指定版本：
 
 ```cmake
-cmake_minimum_required(VERSION 3.16)
-project(my_app LANGUAGES C)
 include(FetchContent)
-
-# 替换为实际发布的仓库地址及固定的 tag 或 commit。
 FetchContent_Declare(
     ssd1315
-    GIT_REPOSITORY https://github.com/<owner>/ssd1315.git
-    GIT_TAG <tag-or-commit>
+    GIT_REPOSITORY https://github.com/leejkee/ssd1315.git
+    GIT_TAG a4fd30557675b69f0f31fa7e472825a0685a7cdf
 )
 FetchContent_MakeAvailable(ssd1315)
-
-add_executable(my_app main.c)
 target_link_libraries(my_app PRIVATE ssd1315::ssd1315)
 ```
 
-仓库尚未配置远程地址，上面的地址和版本是占位符。首次配置需要 Git 和仓库网络访问；离线使用已 clone 的目录时，可传入 `-DFETCHCONTENT_SOURCE_DIR_SSD1315=/path/to/ssd1315`。
-
-两种方式都会自动传递头文件路径和 C99 编译要求，无需全局 `include_directories` 或手动添加驱动源码。库使用父工程的工具链，不指定 MCU、编译器或全局编译选项。
-
-`SSD1315_BUILD_EXAMPLE` 和 `SSD1315_BUILD_TESTS` 默认均为 `OFF`。若需要 ASCII 示例，在导入前设置 `set(SSD1315_BUILD_EXAMPLE ON)`，再链接 `ssd1315::ascii`，它会自动链接核心驱动。`ssd1315` 和 `ssd1315_ascii` 原 target 名称仍然可用。
-
-### 实现平台接口
+## 实现平台接口
 
 用户负责初始化 I²C、GPIO、供电以及模块所需的复位和上电等待，然后提供同步发送函数：
 
@@ -86,14 +74,6 @@ int oled_start(void *bus)
 
 `examples/ascii/` 保留一套原项目的 ASCII 字库和使用示例，不参与核心构建。需要文字时编译该目录的两个 C 文件，调用 `SSD1315_ExampleShowString` 后刷新，或将端口配置传给 `SSD1315_Example` 显示完整演示。示例使用固定 8×16 字符，不自动换行。
 
-## 从旧版本迁移
-
-- `BSP_SSD1315_Init()` 改为 `BSP_SSD1315_Init(&port)`，移除 `main.h`、`i2c.h`、`hi2c1` 依赖。
-- 通信函数由 `void` 改为 `int`，应检查结果。
-- 核心移除 `ShowChar`、`ShowString`、`ShowNum`、`ShowChinese`、`ShowIcon` 和 `CnFontType`；文本排版、数字格式化和字库查找由应用层处理，使用通用 `DrawBitmap` 绘制。
-- 移除原先仅声明、未实现的 `ScrollDisplay`。
-- `DisplayTurn` 的 bit 0 控制 COM 反向，bit 1 控制 SEG 反向，初始化方向为 3。
-
 ## 构建与测试
 
 ```sh
@@ -104,18 +84,32 @@ ctest --test-dir build --output-on-failure
 
 交叉编译时通常关闭测试，使用自己的 CMake toolchain。主机测试通过模拟发送回调检查事务、刷新重试和绘图边界；实屏时序、供电及显示方向需要在目标板验证。
 
-## 字库工具与资料
+## 按需生成字库（推荐结合LLM使用）
 
-`tools/FontTool/` 保留原项目生成工具，非驱动运行依赖。使用时显式指定输出目录；ASCII 工具无第三方 Python 依赖，其他工具需要 Pillow。
+在仓库根目录运行以下命令。ASCII 脚本仅需 Python，其他脚本需先安装 Pillow（`python -m pip install Pillow`）。可用 `--font` 为这些脚本指定包含目标字形的字体文件。
 
 ```sh
-python tools/FontTool/generate_ascii_font.py --out-dir generated
-python tools/FontTool/generate_cn_font.py --no-scan --chars "播放暂停" --out-dir generated
-python tools/FontTool/scan_dir_font.py --chars "歌曲名称" --output-basename font_file_cn --out-dir generated
-python tools/FontTool/generate_emoji_font.py --small-size 12 --large-size 16 --out-dir generated
+# ASCII 数字 0–9；省略范围时生成全部可打印 ASCII
+python tools/FontTool/generate_ascii_font.py --first 0x30 --last 0x39 --out-dir generated
+
+# 中文界面：把需要的汉字追加到内置字表
+python tools/FontTool/generate_cn_font.py --no-scan --chars "温度" --out-dir generated
+
+# 从文件名收集字符：将 ./media 换成自己的目录
+python tools/FontTool/scan_dir_font.py ./media --out-dir generated
+
+# 单码点图标：▶（U+25B6）和 ⏸（U+23F8）
+python tools/FontTool/generate_emoji_font.py --codepoints U+25B6 U+23F8 --out-dir generated
 ```
 
-生成器在输出目录下创建 `include/` 和 `src/`。生成的新字库由应用自行接入。`docs/FontTool.md` 为原工具说明，其中原项目路径仅供背景参考；控制命令说明见 `docs/SSD1315_Command_Table.md`。
+**按 Unicode 码点选字**：图标脚本的 `--codepoints` 接受 `U+25B6`、`0x25B6` 或 `25B6`，多个码点用空格分隔。中文脚本的 `--chars` 接收实际汉字。若只有“温”和“度”的码点，可在 PowerShell 中先转成文字：
+
+```powershell
+$chars = python -c "print(chr(0x6E29) + chr(0x5EA6))"
+python tools/FontTool/generate_cn_font.py --no-scan --chars "$chars" --out-dir generated
+```
+
+将生成的 `generated/src/` 中所需的 C 文件加入工程，并添加头文件路径 `generated/include/`。各脚本的完整参数见 `--help`，屏幕控制命令见 [SSD1315 命令表](docs/SSD1315_Command_Table.md)。
 
 ## 许可证
 
